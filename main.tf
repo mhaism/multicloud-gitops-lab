@@ -3,8 +3,16 @@ provider "aws" {
   region = "ap-southeast-2"
 }
 
+provider "google" {
+  project = "your-gcp-project-id" # Ensure this matches your project
+  region  = "australia-southeast1"
+}
+
 # --- 2. PALO ALTO DATA SOURCE ---
-# (Ensure your data source for panos_image is defined elsewhere or here)
+data "google_compute_image" "panos_image" {
+  project = "paloaltonetworksgcp-public"
+  family  = "vmseries-flex-byol-1102" # Using the image family from your logs
+}
 
 # --- 3. GCP INFRASTRUCTURE ---
 resource "google_compute_network" "vpc_network_gcp" {
@@ -15,27 +23,27 @@ resource "google_compute_network" "vpc_network_gcp" {
 resource "google_compute_instance" "pan_fw" {
   name           = "pan-fw-01"
   machine_type   = "e2-standard-4"
-  zone           = "australia-southeast1-a"
+  zone           = "australia-southeast1-a" [cite: 2]
   can_ip_forward = true 
 
-  # FIXED: Metadata moved here (Direct child of google_compute_instance)
-    metadata = {
-    serial-port-enable  = "TRUE"   # <--- Ensure this is TRUE
-    mgmt-interface-swap = "enable"
-    serial-port-enable  = "TRUE"
+  metadata = {
+    serial-port-enable  = "TRUE"   [cite: 3]
+    mgmt-interface-swap = "enable" [cite: 3]
+    # Primary key for bootstrap credentialing
+    admin-password      = "TemporaryPassword123!" 
+    # Fallback script for initial setup
     startup-script      = "set mgt-config users admin password TemporaryPassword123!"
-	admin-password      = "TemporaryPassword123!" # Use this specific key
   }
 
   boot_disk {
     initialize_params {
       image = data.google_compute_image.panos_image.self_link
       type  = "pd-ssd"
-      size  = 60
+      size  = 100 # Increased to 100GB for PAN-OS 11 stability
     }
   }
 
-  # NIC 0: Management
+  # NIC 0: Management (Maps the External IP to the MGMT interface) [cite: 12]
   network_interface {
     subnetwork = google_compute_subnetwork.mgmt_subnet.id 
     access_config {}
@@ -52,20 +60,7 @@ resource "google_compute_instance" "pan_fw" {
   }
 
   service_account {
-    scopes = ["cloud-platform"]
-  }
-}
-
-output "firewall_management_url" {
-  value = "https://${google_compute_instance.pan_fw.network_interface[0].access_config[0].nat_ip}"
-}
-
-resource "google_compute_router" "gcp_router" {
-  name    = "gcp-to-aws-router"
-  network = google_compute_network.vpc_network_gcp.name
-  region  = "australia-southeast1"
-  bgp {
-    asn = 65001
+    scopes = ["cloud-platform"] [cite: 4]
   }
 }
 
@@ -78,7 +73,7 @@ resource "aws_vpc" "aws_prod_vpc" {
 
 resource "aws_subnet" "aws_mgmt_sub" {
   vpc_id            = aws_vpc.aws_prod_vpc.id
-  cidr_block        = "172.16.10.0/24"
+  cidr_block        = "172.16.10.0/24" [cite: 5]
   availability_zone = "ap-southeast-2a"
   tags = { Name = "aws-mgmt-sub" }
 }
@@ -107,38 +102,40 @@ resource "aws_customer_gateway" "cgw0" {
   bgp_asn    = 65001
   ip_address = google_compute_ha_vpn_gateway.ha_gateway.vpn_interfaces[0].ip_address
   type       = "ipsec.1"
-  tags       = { Name = "cgw-gcp-int0" }
-}
-
-resource "aws_customer_gateway" "cgw1" {
-  bgp_asn    = 65001
-  ip_address = google_compute_ha_vpn_gateway.ha_gateway.vpn_interfaces[1].ip_address
-  type       = "ipsec.1"
-  tags       = { Name = "cgw-gcp-int1" }
+  tags       = { Name = "cgw-gcp-int0" } [cite: 6]
 }
 
 # --- AWS VPN CONNECTION TO TRANSIT GATEWAY ---
 resource "aws_vpn_connection" "vpn_to_gcp" {
   customer_gateway_id = aws_customer_gateway.cgw0.id
-  transit_gateway_id  = aws_ec2_transit_gateway.aws_tgw.id
+  transit_gateway_id  = aws_ec2_transit_gateway.aws_tgw.id [cite: 7]
   type                = "ipsec.1"
   static_routes_only  = false 
   tags                = { Name = "aws-to-gcp-vpn" }
 }
 
-# --- GCP VPN TUNNELS ---
+# --- GCP VPN TUNNEL ---
 resource "google_compute_vpn_tunnel" "tunnel0" {
   name                            = "gcp-to-aws-tunnel0"
-  region                          = "australia-southeast1"
+  region                          = "australia-southeast1" [cite: 8]
   vpn_gateway                     = google_compute_ha_vpn_gateway.ha_gateway.id
   peer_external_gateway           = google_compute_external_vpn_gateway.aws_gateway.id
   peer_external_gateway_interface = 0
   shared_secret                   = aws_vpn_connection.vpn_to_gcp.tunnel1_preshared_key
-  router                          = google_compute_router.gcp_router.name
+  router                          = google_compute_router.gcp_router.name [cite: 9]
   vpn_gateway_interface           = 0
 }
 
-# --- GCP ROUTER INTERFACE ---
+# --- GCP ROUTER & BGP ---
+resource "google_compute_router" "gcp_router" {
+  name    = "gcp-to-aws-router"
+  network = google_compute_network.vpc_network_gcp.name
+  region  = "australia-southeast1"
+  bgp {
+    asn = 65001
+  }
+}
+
 resource "google_compute_router_interface" "iface0" {
   name       = "iface-vpn-0"
   router     = google_compute_router.gcp_router.name
@@ -147,14 +144,13 @@ resource "google_compute_router_interface" "iface0" {
   vpn_tunnel = google_compute_vpn_tunnel.tunnel0.name
 }
 
-# --- GCP BGP PEER ---
 resource "google_compute_router_peer" "peer0" {
-  name                      = "peer-aws-0"
+  name                      = "peer-aws-0" [cite: 10]
   router                    = google_compute_router.gcp_router.name
   region                    = "australia-southeast1"
   peer_ip_address           = aws_vpn_connection.vpn_to_gcp.tunnel1_vgw_inside_address
   peer_asn                  = 65002
-  interface                 = google_compute_router_interface.iface0.name
+  interface                 = google_compute_router_interface.iface0.name [cite: 11]
   advertised_route_priority = 100
 }
 
@@ -172,4 +168,9 @@ resource "google_compute_external_vpn_gateway" "aws_gateway" {
     id         = 1
     ip_address = aws_vpn_connection.vpn_to_gcp.tunnel2_address
   }
+}
+
+# --- OUTPUTS ---
+output "firewall_management_url" {
+  value = "https://${google_compute_instance.pan_fw.network_interface[0].access_config[0].nat_ip}"
 }
