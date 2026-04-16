@@ -3,17 +3,6 @@ provider "aws" {
   region = "ap-southeast-2"
 }
 
-provider "google" {
-  project = "your-gcp-project-id" # Ensure this matches your project
-  region  = "australia-southeast1"
-}
-
-# --- 2. PALO ALTO DATA SOURCE ---
-data "google_compute_image" "panos_image" {
-  project = "paloaltonetworksgcp-public"
-  family  = "vmseries-flex-byol-1102" # Using the image family from your logs
-}
-
 # --- 3. GCP INFRASTRUCTURE ---
 resource "google_compute_network" "vpc_network_gcp" {
   name                    = "gcp-prod-vpc"
