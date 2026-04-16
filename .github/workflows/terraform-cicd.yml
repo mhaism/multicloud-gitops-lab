@@ -55,3 +55,20 @@ jobs:
 
       - name: Terraform Plan
         run: terraform plan -no-color
+steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      # ADD THIS STEP BEFORE TERRAFORM INIT
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.10.0
+
+      - name: Terraform Init
+        run: terraform init
