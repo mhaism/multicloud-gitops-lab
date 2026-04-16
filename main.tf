@@ -21,6 +21,12 @@ resource "google_compute_instance" "pan_fw" {
       image = data.google_compute_image.panos_image.self_link
       type  = "pd-ssd"
       size  = 60
+	  metadata = {
+    # This script will run on boot and set a temporary password
+    mgmt-interface-swap = "enable"
+    serial-port-enable  = "TRUE"
+    # Replace 'TemporaryPassword123!' with something you want
+    startup-script = "set mgt-config users admin password TemporaryPassword123!"
     }
   }
 
