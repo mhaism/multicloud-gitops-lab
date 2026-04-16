@@ -169,8 +169,7 @@ resource "google_compute_external_vpn_gateway" "aws_gateway" {
     ip_address = aws_vpn_connection.vpn_to_gcp.tunnel2_address
   }
 }
-
 # --- OUTPUTS ---
-output "firewall_management_url" {
-  value = "https://${google_compute_instance.pan_fw.network_interface[0].access_config[0].nat_ip}"
+output "firewall_public_ip" {
+  value = google_compute_instance.pan_fw.network_interface.0.access_config.0.nat_ip
 }
