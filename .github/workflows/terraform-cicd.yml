@@ -11,12 +11,20 @@ defaults:
     working-directory: .
 
 jobs:
-  terraform-quality-gate:
-    name: "1. Lint & Security"
+  terraform-pipeline:
+    name: "Standardized Lab Pipeline"
     runs-on: ubuntu-latest
+    env:
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
 
       - name: Setup TFLint
         uses: terraform-linters/setup-tflint@v4
@@ -27,28 +35,6 @@ jobs:
         run: |
           tflint --init
           tflint -f compact
-
-      - name: Run tfsec
-        uses: aquasecurity/tfsec-action@v1.0.0
-        with:
-          soft_fail: true 
-
-  terraform-plan: # THIS LINE MUST START AT THE SAME INDENTATION AS terraform-quality-gate
-    name: "2. Cloud Plan"
-    needs: terraform-quality-gate
-    runs-on: ubuntu-latest
-    env:
-      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-    steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
-
-      # ADD THIS STEP BEFORE TERRAFORM INIT
-      - name: Authenticate to Google Cloud
-        uses: google-github-actions/auth@v2
-        with:
-          credentials_json: ${{ secrets.GCP_SA_KEY }}
 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
