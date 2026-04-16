@@ -19,10 +19,12 @@ resource "google_compute_instance" "pan_fw" {
   can_ip_forward = true 
 
   # FIXED: Metadata moved here (Direct child of google_compute_instance)
-  metadata = {
+    metadata = {
+    serial-port-enable  = "TRUE"   # <--- Ensure this is TRUE
     mgmt-interface-swap = "enable"
     serial-port-enable  = "TRUE"
     startup-script      = "set mgt-config users admin password TemporaryPassword123!"
+	admin-password      = "TemporaryPassword123!" # Use this specific key
   }
 
   boot_disk {
