@@ -23,12 +23,12 @@ resource "google_compute_network" "vpc_network_gcp" {
 resource "google_compute_instance" "pan_fw" {
   name           = "pan-fw-01"
   machine_type   = "e2-standard-4"
-  zone           = "australia-southeast1-a" [cite: 2]
+  zone           = "australia-southeast1-a" 
   can_ip_forward = true 
 
   metadata = {
-    serial-port-enable  = "TRUE"   [cite: 3]
-    mgmt-interface-swap = "enable" [cite: 3]
+    serial-port-enable  = "TRUE"   
+    mgmt-interface-swap = "enable" 
     # Primary key for bootstrap credentialing
     admin-password      = "TemporaryPassword123!" 
     # Fallback script for initial setup
