@@ -45,5 +45,5 @@ resource "google_compute_firewall" "allow_mgmt" {
     ports    = ["443", "22"]
   }
   # Update this line
-  source_ranges = ["0.0.0.0/0"] # <--- CHANGE THIS! (e.g., "203.0.113.50/32")
+  source_ranges = ["0.0.0.0/0"] 
 }
