@@ -1,12 +1,14 @@
 name: "Multicloud GitOps Pipeline"
-defaults:
-  run:
-    shell: bash
-    working-directory: .  # Change this from ./terraform-lab to ./
+
 on:
   push:
     branches: [ main ]
   pull_request:
+
+defaults:
+  run:
+    shell: bash
+    working-directory: .
 
 jobs:
   terraform-quality-gate:
@@ -29,16 +31,12 @@ jobs:
       - name: Run tfsec
         uses: aquasecurity/tfsec-action@v1.0.0
         with:
-          soft_fail: true # Set to false once you've fixed all criticals
+          soft_fail: true 
 
- terraform-plan:
+  terraform-plan: # THIS LINE MUST START AT THE SAME INDENTATION AS terraform-quality-gate
     name: "2. Cloud Plan"
     needs: terraform-quality-gate
     runs-on: ubuntu-latest
-    # Add the working-directory HERE specifically
-    defaults:
-      run:
-        working-directory: ./
     env:
       GOOGLE_CREDENTIALS: ${{ secrets.GCP_SA_KEY }}
       AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
@@ -54,8 +52,6 @@ jobs:
 
       - name: Terraform Init
         run: terraform init
-        # If it still fails, you can even add it to the step:
-        # working-directory: ./
 
       - name: Terraform Plan
         run: terraform plan -no-color
