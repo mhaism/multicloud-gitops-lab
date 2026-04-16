@@ -38,13 +38,12 @@ resource "google_compute_subnetwork" "trust_subnet" {
 
 # 4. Security Rule: Allow you to manage the firewall
 resource "google_compute_firewall" "allow_mgmt" {
-  name    = "allow-pan-mgmt-access"
-  network = google_compute_network.mgmt_vpc.name
-
+  name    = "allow-mgmt"
+  network = google_compute_network.vpc_network.name
   allow {
     protocol = "tcp"
-    ports    = ["22", "443"] # SSH and HTTPS
+    ports    = ["443", "22"]
   }
-
-  source_ranges = ["60.242.95.104/32", "35.235.240.0/20"] # <--- CHANGE THIS! (e.g., "203.0.113.50/32")
+  # Update this line
+  source_ranges = ["60.242.95.104/32", "35.235.240.0/20","1.129.111.93"] # <--- CHANGE THIS! (e.g., "203.0.113.50/32")
 }
