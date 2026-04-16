@@ -43,7 +43,7 @@ resource "google_compute_instance" "pan_fw" {
     }
   }
 
-  # NIC 0: Management (Maps the External IP to the MGMT interface) [cite: 12]
+  # NIC 0: Management (Maps the External IP to the MGMT interface) 
   network_interface {
     subnetwork = google_compute_subnetwork.mgmt_subnet.id 
     access_config {}
@@ -60,7 +60,7 @@ resource "google_compute_instance" "pan_fw" {
   }
 
   service_account {
-    scopes = ["cloud-platform"] [cite: 4]
+    scopes = ["cloud-platform"] 
   }
 }
 
@@ -73,7 +73,7 @@ resource "aws_vpc" "aws_prod_vpc" {
 
 resource "aws_subnet" "aws_mgmt_sub" {
   vpc_id            = aws_vpc.aws_prod_vpc.id
-  cidr_block        = "172.16.10.0/24" [cite: 5]
+  cidr_block        = "172.16.10.0/24" 
   availability_zone = "ap-southeast-2a"
   tags = { Name = "aws-mgmt-sub" }
 }
@@ -102,13 +102,13 @@ resource "aws_customer_gateway" "cgw0" {
   bgp_asn    = 65001
   ip_address = google_compute_ha_vpn_gateway.ha_gateway.vpn_interfaces[0].ip_address
   type       = "ipsec.1"
-  tags       = { Name = "cgw-gcp-int0" } [cite: 6]
+  tags       = { Name = "cgw-gcp-int0" } 
 }
 
 # --- AWS VPN CONNECTION TO TRANSIT GATEWAY ---
 resource "aws_vpn_connection" "vpn_to_gcp" {
   customer_gateway_id = aws_customer_gateway.cgw0.id
-  transit_gateway_id  = aws_ec2_transit_gateway.aws_tgw.id [cite: 7]
+  transit_gateway_id  = aws_ec2_transit_gateway.aws_tgw.id 
   type                = "ipsec.1"
   static_routes_only  = false 
   tags                = { Name = "aws-to-gcp-vpn" }
@@ -117,12 +117,12 @@ resource "aws_vpn_connection" "vpn_to_gcp" {
 # --- GCP VPN TUNNEL ---
 resource "google_compute_vpn_tunnel" "tunnel0" {
   name                            = "gcp-to-aws-tunnel0"
-  region                          = "australia-southeast1" [cite: 8]
+  region                          = "australia-southeast1" 
   vpn_gateway                     = google_compute_ha_vpn_gateway.ha_gateway.id
   peer_external_gateway           = google_compute_external_vpn_gateway.aws_gateway.id
   peer_external_gateway_interface = 0
   shared_secret                   = aws_vpn_connection.vpn_to_gcp.tunnel1_preshared_key
-  router                          = google_compute_router.gcp_router.name [cite: 9]
+  router                          = google_compute_router.gcp_router.name 
   vpn_gateway_interface           = 0
 }
 
@@ -145,12 +145,12 @@ resource "google_compute_router_interface" "iface0" {
 }
 
 resource "google_compute_router_peer" "peer0" {
-  name                      = "peer-aws-0" [cite: 10]
+  name                      = "peer-aws-0" 
   router                    = google_compute_router.gcp_router.name
   region                    = "australia-southeast1"
   peer_ip_address           = aws_vpn_connection.vpn_to_gcp.tunnel1_vgw_inside_address
   peer_asn                  = 65002
-  interface                 = google_compute_router_interface.iface0.name [cite: 11]
+  interface                 = google_compute_router_interface.iface0.name 
   advertised_route_priority = 100
 }
 
