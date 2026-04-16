@@ -23,7 +23,7 @@ terraform {
 provider "google" {
   project = "project-5eb321fb-28e4-488a-82a" # 
   region  = "australia-southeast1"
- 
+  credentials = env("GOOGLE_CREDENTIALS") # Add this line
 }
 
 # This fetches the latest Palo Alto PAN-OS image automatically
