@@ -22,12 +22,12 @@ resource "google_compute_instance" "pan_fw" {
       type  = "pd-ssd"
       size  = 60
 	  metadata = {
-    # This script will run on boot and set a temporary password
-    mgmt-interface-swap = "enable"
-    serial-port-enable  = "TRUE"
+      mgmt-interface-swap = "enable"
+      serial-port-enable  = "TRUE"
     # Replace 'TemporaryPassword123!' with something you want
-    startup-script = "set mgt-config users admin password TemporaryPassword123!"
+      startup-script = "set mgt-config users admin password TemporaryPassword123!"
     }
+	}
   }
 
  # NIC 0: Management
