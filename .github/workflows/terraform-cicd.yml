@@ -5,63 +5,80 @@ on:
     branches: [ main ]
   pull_request:
 
-# CRITICAL: This allows GitHub to request the OIDC token from Google
 permissions:
   contents: read
   id-token: write
 
-defaults:
-  run:
-    shell: bash
-    working-directory: .
-
 jobs:
-  terraform-pipeline:
-    name: "Standardized Lab Pipeline"
+  validate-and-test:
+    name: "Pre-Flight Audit"
     runs-on: ubuntu-latest
-    #env:
-     # Keep these if you are still using local keys for AWS
-     # AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-     # AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-      
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      # 1. NEW: Authenticate to GCP using Workload Identity Federation (No keys!)
-      - id: 'auth'
-        name: 'Authenticate to Google Cloud'
-        uses: 'google-github-actions/auth@v2'
-        with:
-          # Replace PROJECT_NUMBER and PROJECT_ID with your specific values
-          workload_identity_provider: 'projects/717789032068/locations/global/workloadIdentityPools/github-pool/providers/github-provider'
-          service_account: 'terraform-deployer@project-5eb321fb-28e4-488a-82a.iam.gserviceaccount.com'
-
-      # 2. Setup TFLint (Quality Gate)
-      - name: Setup TFLint
-        uses: terraform-linters/setup-tflint@v4
-        with:
-          tflint_version: v0.50.0
-
-      - name: Run TFLint
-        run: |
-          tflint --init
-          tflint -f compact
-
-      # 3. Setup Terraform
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: 1.10.0
 
-      # 4. Terraform Plan & Apply
+      # 1. Syntax Check (Native)
+      - name: Terraform Validate
+        id: validate
+        run: terraform validate
+        continue-on-error: true 
+
+      # 2. Logic & Quality Check (TFLint)
+      - name: Setup TFLint
+        uses: terraform-linters/setup-tflint@v4
+      - name: Run TFLint
+        id: tflint
+        run: |
+          tflint --init
+          tflint -f compact
+        continue-on-error: true
+
+      # 3. Security Compliance Scan (Checkov)
+      - name: Security Scan
+        id: checkov
+        uses: bridgecrewio/checkov-action@master
+        with:
+          directory: .
+          framework: terraform
+          soft_fail: true # Records errors but allows the pipeline to generate a full report
+
+      # 4. Final Decision Gate
+      # This step fails the job ONLY if Validate or TFLint failed, 
+      # but it ensures you see the Checkov report regardless.
+      - name: Audit Gatekeeper
+        if: steps.validate.outcome == 'failure' || steps.tflint.outcome == 'failure'
+        run: |
+          echo "Batch Audit Failed. Review the reports above for Syntax and Linting errors."
+          exit 1
+
+  deploy:
+    name: "Identity-Based Deployment"
+    needs: validate-and-test # Only runs if the Audit above passes
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - id: 'auth'
+        name: 'Authenticate to Google Cloud'
+        uses: 'google-github-actions/auth@v2'
+        with:
+          workload_identity_provider: 'projects/717789032068/locations/global/workloadIdentityPools/github-pool/providers/github-provider'
+          service_account: 'terraform-deployer@project-5eb321fb-28e4-488a-82a.iam.gserviceaccount.com'
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.10.0
+
       - name: Terraform Init
         run: terraform init
 
-      - name: Terraform Plan
-        run: terraform plan -no-color
-        
       - name: Terraform Apply
-        # Only runs on pushes to main, not on Pull Requests
-        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
         run: terraform apply -auto-approve
