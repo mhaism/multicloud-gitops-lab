@@ -1,38 +1,37 @@
 # =============================================================================
-# 1. TERRAFORM CONFIGURATION (The "Zero-Trust" Control Plane)
+# 1. TERRAFORM CONFIGURATION & PROVIDER
 # =============================================================================
 terraform {
   required_version = ">= 1.10.0"
-
   required_providers {
     google = {
       source  = "hashicorp/google"
-      version = "~> 6.0" 
+      version = "~> 6.0"
     }
   }
-
-  # Keyless state storage using the GCS bucket you created
   backend "gcs" {
-    bucket  = "project-5eb321fb-28e4-488a-82a-tfstate" 
-    prefix  = "terraform/state"
+    bucket = "project-5eb321fb-28e4-488a-82a-tfstate"
+    prefix = "terraform/state"
   }
 }
 
-# =============================================================================
-# 2. PROVIDER SETUP
-# =============================================================================
 provider "google" {
   project = "project-5eb321fb-28e4-488a-82a"
-  region  = "australia-southeast1" # Sydney
+  region  = "australia-southeast1" # Sydney-based context
 }
 
 # =============================================================================
-# 3. IDENTITY & APIS
+# 2. APIS & IDENTITY (Zero-Trust Enablement)
 # =============================================================================
 
-# Enable the Cloud Run API (Service-level permission)
-resource "google_project_service" "run_api" {
-  service            = "run.googleapis.com"
+# Enable necessary APIs for Serverless and Identity
+resource "google_project_service" "enabled_apis" {
+  for_each = toset([
+    "run.googleapis.com",
+    "iap.googleapis.com",
+    "compute.googleapis.com" # Required for Load Balancing
+  ])
+  service            = each.key
   disable_on_destroy = false
 }
 
@@ -43,32 +42,35 @@ resource "google_service_account" "serverless_identity" {
 }
 
 # =============================================================================
-# 4. SERVERLESS DATA PLANE (The "Workload")
+# 3. SERVERLESS WORKLOAD (Cloud Run)
 # =============================================================================
 
-# Deploy the Cloud Run Service to Sydney
 resource "google_cloud_run_v2_service" "identity_app" {
   name     = "identity-lab-app"
   location = "australia-southeast1"
-  ingress  = "INGRESS_TRAFFIC_ALL"
+  ingress  = "INGRESS_TRAFFIC_ALL" # Using IAP at the app layer
 
   template {
     containers {
-      image = "us-docker.pkg.dev/cloudrun/container/hello" 
+      image = "us-docker.pkg.dev/cloudrun/container/hello"
     }
-    # Bind the workload to our specific Service Account
     service_account = google_service_account.serverless_identity.email
   }
 
-  depends_on = [google_project_service.run_api]
+  depends_on = [google_project_service.enabled_apis]
 }
 
-# Allow Public Access (Verification endpoint)
-resource "google_cloud_run_v2_service_iam_member" "public_invoker" {
+# =============================================================================
+# 4. IDENTITY-BASED ACCESS (The Audit Fix)
+# =============================================================================
+
+# REMOVED: allUsers (Public access is a compliance failure)
+# ADDED: Explicit Identity-Aware Proxy permission 
+resource "google_cloud_run_v2_service_iam_member" "iap_authorized_user" {
   name     = google_cloud_run_v2_service.identity_app.name
   location = google_cloud_run_v2_service.identity_app.location
   role     = "roles/run.invoker"
-  member   = "allUsers"
+  member   = "user:your-email@example.com" # Replace with your Australian lab email
 }
 
 # =============================================================================

@@ -1,17 +1,4 @@
-# --- Terraform Specific ---
-
-**/.terraform/* # The heavy provider binaries (The cause of your error!)
-*.tfvars                 # Your secrets and local variables
-terraform.tfstate* # Your infrastructure state (should be in S3, not Git)
-.terraform.lock.hcl      # Optional: some keep this, some ignore it
+# Ignore local secrets and state
+*.tfvars
 .terraform/
-*.tfstate
-*.tfstate.backup
-.terraform.lock.hcl
-
-
-# --- System Specific ---
-
-.DS_Store                # Mac system files
-Thumbs.db                # Windows thumbnail cache
-desktop.ini              # Windows folder settings
+terraform.tfstate*
