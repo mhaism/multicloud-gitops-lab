@@ -1,3 +1,14 @@
+terraform {
+  # 1. Satisfies "terraform_required_version"
+  required_version = ">= 1.10.0"
+
+  # 2. Satisfies "terraform_required_providers"
+  required_providers {
+    google = {
+      source  = "hashicorp/google"
+      version = "~> 6.0" 
+    }
+  }
 # 1. NEW: Move the state file from AWS S3 to Google Cloud Storage
 terraform {
   backend "gcs" {
