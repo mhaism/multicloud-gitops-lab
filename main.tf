@@ -9,6 +9,7 @@ terraform {
       version = "~> 6.0" 
     }
   }
+  }
 # 1. NEW: Move the state file from AWS S3 to Google Cloud Storage
 terraform {
   backend "gcs" {
