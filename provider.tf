@@ -24,9 +24,3 @@ provider "google" {
   project = "project-5eb321fb-28e4-488a-82a" # 
   region  = "australia-southeast1"
 }
-
-# This fetches the latest Palo Alto PAN-OS image automatically
-data "google_compute_image" "panos_image" {
-  name  = "vmseries-flex-byol-1102" 
-  project = "paloaltonetworksgcp-public"
-}
