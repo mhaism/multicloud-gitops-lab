@@ -33,6 +33,7 @@ resource "google_cloud_run_v2_service" "identity_app" {
   name     = "identity-lab-app"
   location = "australia-southeast1"
   ingress  = "INGRESS_TRAFFIC_ALL"
+  deletion_protection = false # Change this to false
 
   template {
     containers {
