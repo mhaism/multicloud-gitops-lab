@@ -1,8 +1,14 @@
 name: "Multicloud GitOps Pipeline"
+
 on:
   push:
     branches: [ main ]
   pull_request:
+
+# CRITICAL: This allows GitHub to request the OIDC token from Google
+permissions:
+  contents: read
+  id-token: write
 
 defaults:
   run:
@@ -14,17 +20,24 @@ jobs:
     name: "Standardized Lab Pipeline"
     runs-on: ubuntu-latest
     env:
+      # Keep these if you are still using local keys for AWS
       AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
       AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Authenticate to Google Cloud
-        uses: google-github-actions/auth@v2
+      # 1. NEW: Authenticate to GCP using Workload Identity Federation (No keys!)
+      - id: 'auth'
+        name: 'Authenticate to Google Cloud'
+        uses: 'google-github-actions/auth@v2'
         with:
-          credentials_json: ${{ secrets.GCP_CREDENTIALS }}
+          # Replace PROJECT_NUMBER and PROJECT_ID with your specific values
+          workload_identity_provider: 'projects/717789032068/locations/global/workloadIdentityPools/github-pool/providers/github-provider'
+          service_account: 'terraform-deployer@project-5eb321fb-28e4-488a-82a.iam.gserviceaccount.com'
 
+      # 2. Setup TFLint (Quality Gate)
       - name: Setup TFLint
         uses: terraform-linters/setup-tflint@v4
         with:
@@ -35,16 +48,20 @@ jobs:
           tflint --init
           tflint -f compact
 
+      # 3. Setup Terraform
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: 1.10.0
 
+      # 4. Terraform Plan & Apply
       - name: Terraform Init
         run: terraform init
 
       - name: Terraform Plan
         run: terraform plan -no-color
         
-      - name: Terraform Destroy
-        run: terraform destroy -auto-approve
+      - name: Terraform Apply
+        # Only runs on pushes to main, not on Pull Requests
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        run: terraform apply -auto-approve
